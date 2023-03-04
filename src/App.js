@@ -1,25 +1,71 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import io from "socket.io-client";
+import AudioPlayer from "./AudioPlayer";
 
-function App() {
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioContext = new AudioContext();
+
+const Chat = () => {
+  const [stream, setStream] = useState(null);
+  const [recorder, setRecorder] = useState(null);
+  const [audioBuffer, setAudioBuffer] = useState(null);
+  const [socket, setSocket] = useState(null);
+
+  //Transmitindo
+  useEffect(() => {
+    console.log(process.env.REACT_APP_STREAM_URL)
+    const socket = io(process.env.REACT_APP_STREAM_URL);
+    setSocket(socket);
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        setStream(stream);
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+        processor.onaudioprocess = (e) => {
+          const buffer = e.inputBuffer.getChannelData(0);
+          console.log("transmitindo");
+          socket.emit("audio", buffer);
+        };
+        const mediaRecorder = new MediaRecorder(stream);
+        setRecorder(mediaRecorder);
+      })
+      .catch((err) => {
+        console.log("Error:", err);
+      });
+  }, []);
+
+  //Listening
+  useEffect(() => {
+    if (!socket) return;
+    socket.on("audio", (audio) => {
+      console.log("Ouvindo...");
+      const audioData = new Float32Array(audio);
+      const audioSource = audioContext.createBufferSource();
+      const audioBuffer = audioContext.createBuffer(
+        1,
+        audioData.length,
+        audioContext.sampleRate
+      );
+
+      audioBuffer.copyToChannel(audioData, 0);
+      audioSource.buffer = audioBuffer;
+      audioSource.connect(audioContext.destination);
+      audioSource.start();
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, [socket]);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <AudioPlayer audioBuffer={audioBuffer} />
     </div>
   );
-}
+};
 
-export default App;
+export default Chat;
