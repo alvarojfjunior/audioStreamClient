@@ -13,7 +13,6 @@ const Chat = () => {
 
   //Transmitindo
   useEffect(() => {
-    console.log(process.env.REACT_APP_STREAM_URL)
     const socket = io(process.env.REACT_APP_STREAM_URL);
     setSocket(socket);
     navigator.mediaDevices
@@ -42,7 +41,6 @@ const Chat = () => {
   useEffect(() => {
     if (!socket) return;
     socket.on("audio", (audio) => {
-      console.log("Ouvindo...");
       const audioData = new Float32Array(audio);
       const audioSource = audioContext.createBufferSource();
       const audioBuffer = audioContext.createBuffer(
